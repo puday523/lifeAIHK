@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeAnalytics - Your Personal Health Assessment</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<style>
+:where([class^="ri-"])::before { content: "\f3c2"; }
+body { font-family: 'Inter', sans-serif; }
+.progress-ring { transform: rotate(-90deg); }
+</style>
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#4F46E5',
+secondary: '#10B981'
+},
+borderRadius: {
+'none': '0px',
+'sm': '4px',
+DEFAULT: '8px',
+'md': '12px',
+'lg': '16px',
+'xl': '20px',
+'2xl': '24px',
+'3xl': '32px',
+'full': '9999px',
+'button': '8px'
+}
+}
+}
+}
+</script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<header class="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
+<nav class="container mx-auto px-6 h-16 flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-heart-pulse-line text-primary text-2xl"></i>
+</div>
+<span class="text-2xl font-['Pacifico'] text-primary">logo</span>
+</div>
+<div class="flex items-center space-x-6">
+<div class="flex items-center space-x-2 text-sm">
+<button onclick="changeLang('en')" class="px-3 py-1 rounded-full hover:bg-gray-200 cursor-pointer lang-btn" data-lang="en">EN</button>
+<button onclick="changeLang('zh-TW')" class="px-3 py-1 rounded-full hover:bg-gray-200 cursor-pointer lang-btn" data-lang="zh-TW">繁</button>
+<button onclick="changeLang('zh-CN')" class="px-3 py-1 rounded-full hover:bg-gray-200 cursor-pointer lang-btn" data-lang="zh-CN">简</button>
+</div>
+<button class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary cursor-pointer !rounded-button">Sign In</button>
+<button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 cursor-pointer !rounded-button">Sign Up</button>
+</div>
+</nav>
+</header>
+<main class="pt-16">
+<div id="questionnaireModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl w-[800px] max-h-[80vh] overflow-y-auto">
+<div class="p-6">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-2xl font-bold text-gray-900">Health Assessment</h3>
+<button onclick="closeQuestionnaire()" class="text-gray-500 hover:text-gray-700">
+<i class="ri-close-line text-2xl"></i>
+</button>
+</div>
+<div class="mb-6">
+<div class="h-2 bg-gray-200 rounded-full">
+<div id="progressBar" class="h-2 bg-primary rounded-full transition-all" style="width: 0%"></div>
+</div>
+<div class="flex justify-between text-sm text-gray-500 mt-2">
+<span id="currentQuestion">Question 0 of 20</span>
+<span id="timeRemaining">Estimated time: 15 mins</span>
+</div>
+</div>
+<div id="questionContainer" class="space-y-6">
+<!-- Questions will be dynamically inserted here -->
+</div>
+<div class="flex justify-between mt-8">
+<button onclick="previousQuestion()" id="prevBtn" class="px-6 py-2 text-gray-700 border border-gray-300 rounded-button hidden">Previous</button>
+<button onclick="nextQuestion()" id="nextBtn" class="px-6 py-2 bg-primary text-white rounded-button">Next</button>
+</div>
+</div>
+</div>
+</div>
+<div id="aiLoadingModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+<div class="bg-white rounded-xl p-8 flex flex-col items-center max-w-md">
+<div class="w-24 h-24 relative mb-4">
+<div class="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+<div class="absolute inset-0 border-4 border-primary rounded-full animate-spin" style="border-top-color: transparent"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<i class="ri-ai-generate text-primary text-3xl"></i>
+</div>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">AI Analysis in Progress</h3>
+<p class="text-gray-600 text-center mb-4">Our AI is analyzing your responses and generating personalized insights...</p>
+<div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+<div class="bg-primary h-2 rounded-full transition-all duration-1000" id="aiProgressBar" style="width: 0%"></div>
+</div>
+<div class="text-sm text-gray-500" id="aiProgressText">Analyzing health patterns...</div>
+</div>
+</div>
+<div id="reportModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl w-[800px] max-h-[80vh] overflow-y-auto">
+<div class="p-6">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-2xl font-bold text-gray-900">Your Health Report</h3>
+<button onclick="closeReport()" class="text-gray-500 hover:text-gray-700">
+<i class="ri-close-line text-2xl"></i>
+</button>
+</div>
+<div class="space-y-8">
+<div class="p-4 bg-gray-50 rounded-lg">
+<h4 class="text-lg font-semibold mb-2">Life Expectancy Prediction</h4>
+<div class="flex items-center">
+<div class="relative w-24 h-24">
+<svg class="progress-ring" width="96" height="96">
+<circle class="text-gray-200" stroke-width="8" stroke="currentColor" fill="transparent" r="40" cx="48" cy="48"/>
+<circle class="text-primary transition-all" stroke-width="8" stroke="currentColor" fill="transparent" r="40" cx="48" cy="48" id="lifeExpectancyRing"/>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-primary" id="lifeExpectancy">85</span>
+</div>
+<div class="ml-4">
+<p class="text-sm text-gray-600">Based on your current lifestyle habits</p>
+<p class="text-sm text-gray-600">Above average for your demographic</p>
+</div>
+</div>
+</div>
+<div>
+<h4 class="text-lg font-semibold mb-4">Health Indices</h4>
+<div class="grid grid-cols-3 gap-4">
+<div class="p-4 bg-gray-50 rounded-lg">
+<div class="text-sm text-gray-600 mb-1">Cardiovascular Health</div>
+<div class="text-2xl font-bold text-primary">92%</div>
+</div>
+<div class="p-4 bg-gray-50 rounded-lg">
+<div class="text-sm text-gray-600 mb-1">Metabolic Rate</div>
+<div class="text-2xl font-bold text-primary">85%</div>
+</div>
+<div class="p-4 bg-gray-50 rounded-lg">
+<div class="text-sm text-gray-600 mb-1">Immune System</div>
+<div class="text-2xl font-bold text-primary">88%</div>
+</div>
+</div>
+</div>
+<div>
+<h4 class="text-lg font-semibold mb-4">Risk Assessment</h4>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+<div>
+<div class="font-medium">Diabetes Risk</div>
+<div class="text-sm text-gray-600">Based on diet and activity level</div>
+</div>
+<div class="text-green-500 font-medium">Low Risk</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+<div>
+<div class="font-medium">Heart Disease Risk</div>
+<div class="text-sm text-gray-600">Based on lifestyle factors</div>
+</div>
+<div class="text-yellow-500 font-medium">Moderate Risk</div>
+</div>
+</div>
+</div>
+<div>
+<h4 class="text-lg font-semibold mb-4">Recommendations</h4>
+<div class="space-y-4">
+<div class="p-4 bg-gray-50 rounded-lg">
+<div class="flex items-center space-x-3 mb-2">
+<i class="ri-restaurant-line text-primary"></i>
+<span class="font-medium">Diet Suggestions</span>
+</div>
+<p class="text-sm text-gray-600">Increase intake of whole grains and reduce processed foods. Consider adding more leafy greens to your diet.</p>
+</div>
+<div class="p-4 bg-gray-50 rounded-lg">
+<div class="flex items-center space-x-3 mb-2">
+<i class="ri-run-line text-primary"></i>
+<span class="font-medium">Exercise Plan</span>
+</div>
+<p class="text-sm text-gray-600">Aim for 30 minutes of moderate exercise 5 times per week. Include both cardio and strength training.</p>
+</div>
+<div class="p-4 bg-gray-50 rounded-lg">
+<div class="flex items-center space-x-3 mb-2">
+<i class="ri-moon-line text-primary"></i>
+<span class="font-medium">Sleep Improvement</span>
+</div>
+<p class="text-sm text-gray-600">Maintain a consistent sleep schedule. Avoid screens 1 hour before bedtime.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<section class="relative bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+<div class="container mx-auto px-6 py-24">
+<div class="grid grid-cols-2 gap-12 items-center">
+<div>
+<h1 class="text-5xl font-bold text-gray-900 leading-tight mb-6" data-i18n="hero_title">
+LifeAI: Predict Your Lifespan, Unlock Your Health Potential!
+</h1>
+<p class="text-lg text-gray-600 mb-8" data-i18n="hero_desc">
+Take our comprehensive assessment to understand your health, lifestyle, and longevity potential. Get personalized insights and actionable recommendations.
+</p>
+<div class="flex items-center space-x-4">
+<button onclick="startQuestionnaire()" class="px-8 py-4 bg-primary text-white font-medium hover:bg-primary/90 cursor-pointer !rounded-button flex items-center">
+Start Assessment
+<i class="ri-arrow-right-line ml-2"></i>
+</button>
+<div class="text-sm text-gray-500">
+<i class="ri-time-line mr-1"></i>
+Takes about 15 minutes
+</div>
+</div>
+</div>
+<div class="relative">
+<img src="https://public.readdy.ai/ai/img_res/b32274e666be92662c597a57c085be4f.jpg"
+alt="AI Health Analysis Illustration"
+class="w-full h-auto rounded-2xl shadow-xl">
+</div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-white">
+<div class="container mx-auto px-6">
+<h2 class="text-3xl font-bold text-center text-gray-900 mb-4">Assessment Categories</h2>
+<p class="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
+Our AI-powered assessment system covers six key areas of your life, analyzing over 100 data points to provide you with the most accurate and personalized health insights and actionable recommendations.
+</p>
+<div class="grid grid-cols-2 gap-6">
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-restaurant-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Eating Habits</h3>
+<p class="text-gray-600">Analyze daily eating structure, nutritional intake, dietary preferences, regularity, water intake, and processed food consumption.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-moon-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Sleep Quality</h3>
+<p class="text-gray-600">Evaluate sleep duration, patterns, falling asleep difficulty, interruptions, and post-wake state.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-run-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Exercise & Fitness</h3>
+<p class="text-gray-600">Track exercise frequency, types, daily activity, physical fitness, and sedentary habits.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-mental-health-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Mental Health</h3>
+<p class="text-gray-600">Assess stress levels, emotional state, anxiety/depression tendencies, psychological adjustment, and happiness.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-briefcase-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Work & Career</h3>
+<p class="text-gray-600">Evaluate work stress, job satisfaction, working hours, career development, and work-life balance.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-team-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Social Relations</h3>
+<p class="text-gray-600">Measure friendship quality, social interaction frequency, loneliness levels, and social support systems.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-heart-pulse-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Health History</h3>
+<p class="text-gray-600">Review medical history, chronic conditions, family health background, and current health status.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-emotion-happy-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Lifestyle Balance</h3>
+<p class="text-gray-600">Analyze daily routines, stress management, leisure activities, and personal time allocation.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-home-heart-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Living Environment</h3>
+<p class="text-gray-600">Evaluate living conditions, environmental factors, air quality, and home wellness setup.</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl border border-gray-200 hover:border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+<div class="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-xl mb-4">
+<i class="ri-focus-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-xl font-semibold text-gray-900 mb-2">Personal Goals</h3>
+<p class="text-gray-600">Set and track health objectives, lifestyle improvements, and personal development targets.</p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-gray-50">
+<div class="container mx-auto px-6">
+<h2 class="text-3xl font-bold text-center text-gray-900 mb-4">How It Works</h2>
+<p class="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
+Our advanced AI-powered system analyzes your responses to provide personalized insights and recommendations.
+</p>
+<div class="grid grid-cols-4 gap-8">
+<div class="text-center">
+<div class="w-16 h-16 flex items-center justify-center bg-primary/10 rounded-full mx-auto mb-4">
+<i class="ri-questionnaire-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-lg font-semibold text-gray-900 mb-2">Answer Questions</h3>
+<p class="text-gray-600">Complete our comprehensive questionnaire about your lifestyle.</p>
+</div>
+<div class="text-center">
+<div class="w-16 h-16 flex items-center justify-center bg-primary/10 rounded-full mx-auto mb-4">
+<i class="ri-ai-generate text-primary text-2xl"></i>
+</div>
+<h3 class="text-lg font-semibold text-gray-900 mb-2">AI Analysis</h3>
+<p class="text-gray-600">Our AI processes your data to generate insights.</p>
+</div>
+<div class="text-center">
+<div class="w-16 h-16 flex items-center justify-center bg-primary/10 rounded-full mx-auto mb-4">
+<i class="ri-file-chart-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-lg font-semibold text-gray-900 mb-2">Get Report</h3>
+<p class="text-gray-600">Receive a detailed analysis of your health metrics.</p>
+</div>
+<div class="text-center">
+<div class="w-16 h-16 flex items-center justify-center bg-primary/10 rounded-full mx-auto mb-4">
+<i class="ri-road-map-line text-primary text-2xl"></i>
+</div>
+<h3 class="text-lg font-semibold text-gray-900 mb-2">Take Action</h3>
+<p class="text-gray-600">Follow personalized recommendations to improve.</p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-white">
+<div class="container mx-auto px-6">
+<div class="grid grid-cols-2 gap-12 items-center">
+<div>
+<h2 class="text-3xl font-bold text-gray-900 mb-6">Comprehensive Health Analysis</h2>
+<p class="text-gray-600 mb-8">
+Our advanced analytics provide detailed insights into various aspects of your health and lifestyle:
+</p>
+<ul class="space-y-4">
+<li class="flex items-center space-x-3">
+<div class="w-6 h-6 flex items-center justify-center bg-primary/10 rounded-full">
+<i class="ri-check-line text-primary"></i>
+</div>
+<span class="text-gray-700">Life expectancy prediction based on current habits</span>
+</li>
+<li class="flex items-center space-x-3">
+<div class="w-6 h-6 flex items-center justify-center bg-primary/10 rounded-full">
+<i class="ri-check-line text-primary"></i>
+</div>
+<span class="text-gray-700">Body function and vital signs assessment</span>
+</li>
+<li class="flex items-center space-x-3">
+<div class="w-6 h-6 flex items-center justify-center bg-primary/10 rounded-full">
+<i class="ri-check-line text-primary"></i>
+</div>
+<span class="text-gray-700">Potential health risk identification</span>
+</li>
+<li class="flex items-center space-x-3">
+<div class="w-6 h-6 flex items-center justify-center bg-primary/10 rounded-full">
+<i class="ri-check-line text-primary"></i>
+</div>
+<span class="text-gray-700">Personalized lifestyle improvement suggestions</span>
+</li>
+</ul>
+</div>
+<div id="healthChart" class="w-full h-96"></div>
+</div>
+</div>
+</section>
+<section class="py-20 bg-gray-50">
+<div class="container mx-auto px-6">
+<h2 class="text-3xl font-bold text-center text-gray-900 mb-12">What Our Users Say</h2>
+<div class="grid grid-cols-3 gap-8">
+<div class="bg-white p-6 rounded-xl shadow-sm">
+<div class="flex items-center mb-4">
+<div class="w-12 h-12 rounded-full bg-gray-200 mr-4"></div>
+<div>
+<h4 class="font-semibold text-gray-900">Emily Thompson</h4>
+<p class="text-sm text-gray-500">Marketing Director</p>
+</div>
+</div>
+<p class="text-gray-600">"The assessment provided me with valuable insights about my lifestyle choices. I've made several changes based on the recommendations."</p>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-sm">
+<div class="flex items-center mb-4">
+<div class="w-12 h-12 rounded-full bg-gray-200 mr-4"></div>
+<div>
+<h4 class="font-semibold text-gray-900">Michael Chen</h4>
+<p class="text-sm text-gray-500">Software Engineer</p>
+</div>
+</div>
+<p class="text-gray-600">"I was surprised by how accurate the analysis was. The personalized recommendations were practical and easy to implement."</p>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-sm">
+<div class="flex items-center mb-4">
+<div class="w-12 h-12 rounded-full bg-gray-200 mr-4"></div>
+<div>
+<h4 class="font-semibold text-gray-900">Sarah Johnson</h4>
+<p class="text-sm text-gray-500">Healthcare Professional</p>
+</div>
+</div>
+<p class="text-gray-600">"As a healthcare professional, I'm impressed by the scientific approach. The assessment is thorough and the results are well-presented."</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<footer class="bg-gray-900 text-gray-400 py-12">
+<div class="container mx-auto px-6">
+<div class="grid grid-cols-4 gap-8">
+<div>
+<div class="flex items-center space-x-2 text-white mb-6">
+<div class="w-8 h-8 flex items-center justify-center">
+<i class="ri-heart-pulse-line text-2xl"></i>
+</div>
+<span class="text-2xl font-['Pacifico']">logo</span>
+</div>
+<p class="text-sm">Empowering individuals to make informed decisions about their health and lifestyle through data-driven insights.</p>
+</div>
+<div>
+<h4 class="text-white font-semibold mb-4">Quick Links</h4>
+<ul class="space-y-2 text-sm">
+<li><a href="#" class="hover:text-white">About Us</a></li>
+<li><a href="#" class="hover:text-white">How It Works</a></li>
+<li><a href="#" class="hover:text-white">Pricing</a></li>
+<li><a href="#" class="hover:text-white">Contact</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-white font-semibold mb-4">Legal</h4>
+<ul class="space-y-2 text-sm">
+<li><a href="#" class="hover:text-white">Privacy Policy</a></li>
+<li><a href="#" class="hover:text-white">Terms of Service</a></li>
+<li><a href="#" class="hover:text-white">Cookie Policy</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-white font-semibold mb-4">Newsletter</h4>
+<p class="text-sm mb-4">Stay updated with our latest insights and news.</p>
+<div class="flex">
+<input type="email" placeholder="Enter your email" class="flex-1 px-4 py-2 rounded-l-button text-gray-900 text-sm border-none">
+<button class="px-4 py-2 bg-primary text-white rounded-r-button text-sm whitespace-nowrap">Subscribe</button>
+</div>
+</div>
+</div>
+<div class="border-t border-gray-800 mt-12 pt-8 text-sm text-center">
+<p>&copy; 2025 LifeAnalytics. All rights reserved.</p>
+</div>
+</div>
+</footer>
+<script>
+let currentQuestionIndex = 0;
+const questions = [
+{
+id: 1,
+type: 'single',
+question: 'What is your gender?',
+options: [
+'Male',
+'Female',
+'Other',
+'Prefer not to say'
+]
+},
+{
+id: 2,
+type: 'open',
+question: 'What is your age?'
+},
+{
+id: 3,
+type: 'single',
+question: 'What is your height? (in cm)',
+options: [
+'Less than 150cm',
+'150-160cm',
+'161-170cm',
+'171-180cm',
+'181-190cm',
+'More than 190cm'
+]
+},
+{
+id: 4,
+type: 'single',
+question: 'What is your weight? (in kg)',
+options: [
+'Less than 45kg',
+'45-55kg',
+'56-65kg',
+'66-75kg',
+'76-85kg',
+'86-95kg',
+'More than 95kg'
+]
+},
+{
+id: 5,
+type: 'single',
+question: 'How would you describe your diet?',
+options: [
+'Mostly plant-based',
+'Balanced mix of plant and animal products',
+'Mostly meat-based',
+'Processed foods dominant'
+]
+},
+{
+id: 2,
+type: 'multiple',
+question: 'Which physical activities do you regularly engage in? (Select all that apply)',
+options: [
+'Walking',
+'Running',
+'Swimming',
+'Cycling',
+'Weight training',
+'Team sports'
+]
+},
+{
+id: 3,
+type: 'scale',
+question: 'How would you rate your stress level on a typical day?',
+min: 1,
+max: 10,
+labels: ['Very low', 'Very high']
+},
+{
+id: 4,
+type: 'open',
+question: 'What are your main health concerns or goals?'
+}
+];
+function startQuestionnaire() {
+currentQuestionIndex = 0;
+document.getElementById('questionnaireModal').classList.remove('hidden');
+showQuestion(currentQuestionIndex);
+updateProgress();
+}
+function closeQuestionnaire() {
+document.getElementById('questionnaireModal').classList.add('hidden');
+}
+function showQuestion(index) {
+const question = questions[index];
+const container = document.getElementById('questionContainer');
+container.innerHTML = '';
+const questionElement = document.createElement('div');
+questionElement.className = 'mb-4';
+questionElement.innerHTML = `<h4 class="text-lg font-medium mb-4">${question.question}</h4>`;
+switch(question.type) {
+case 'single':
+questionElement.innerHTML += `
+<div class="space-y-3">
+${question.options.map((option, i) => `
+<div class="flex items-center">
+<input type="radio" id="option${i}" name="question${question.id}" value="${option}" class="mr-3">
+<label for="option${i}">${option}</label>
+</div>
+`).join('')}
+</div>
+`;
+break;
+case 'multiple':
+questionElement.innerHTML += `
+<div class="space-y-3">
+${question.options.map((option, i) => `
+<div class="flex items-center">
+<input type="checkbox" id="option${i}" name="question${question.id}" value="${option}" class="mr-3">
+<label for="option${i}">${option}</label>
+</div>
+`).join('')}
+</div>
+`;
+break;
+case 'scale':
+questionElement.innerHTML += `
+<div class="w-full">
+<input type="range" min="${question.min}" max="${question.max}" class="w-full" id="scale${question.id}">
+<div class="flex justify-between text-sm text-gray-500 mt-2">
+${question.labels.map(label => `<span>${label}</span>`).join('')}
+</div>
+</div>
+`;
+break;
+case 'open':
+questionElement.innerHTML += `
+<textarea class="w-full h-32 p-3 border border-gray-300 rounded-lg" placeholder="Type your answer here..."></textarea>
+`;
+break;
+}
+container.appendChild(questionElement);
+updateNavButtons();
+}
+function updateNavButtons() {
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+prevBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+nextBtn.textContent = currentQuestionIndex === questions.length - 1 ? 'Submit' : 'Next';
+}
+function updateProgress() {
+const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+document.getElementById('progressBar').style.width = `${progress}%`;
+document.getElementById('currentQuestion').textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+}
+function previousQuestion() {
+if (currentQuestionIndex > 0) {
+currentQuestionIndex--;
+showQuestion(currentQuestionIndex);
+updateProgress();
+}
+}
+function nextQuestion() {
+if (currentQuestionIndex < questions.length - 1) {
+currentQuestionIndex++;
+showQuestion(currentQuestionIndex);
+updateProgress();
+} else {
+closeQuestionnaire();
+showAiLoading();
+}
+}
+function showAiLoading() {
+document.getElementById('aiLoadingModal').classList.remove('hidden');
+const progressBar = document.getElementById('aiProgressBar');
+const progressText = document.getElementById('aiProgressText');
+const stages = [
+'Analyzing health patterns...',
+'Processing lifestyle data...',
+'Generating personalized insights...',
+'Preparing recommendations...',
+'Finalizing your report...'
+];
+let currentStage = 0;
+const updateProgress = () => {
+const progress = (currentStage + 1) * 20;
+progressBar.style.width = `${progress}%`;
+progressText.textContent = stages[currentStage];
+if (currentStage < stages.length - 1) {
+currentStage++;
+setTimeout(updateProgress, 1000);
+} else {
+setTimeout(() => {
+document.getElementById('aiLoadingModal').classList.add('hidden');
+showReport();
+}, 1000);
+}
+};
+updateProgress();
+}
+function showReport() {
+document.getElementById('reportModal').classList.remove('hidden');
+// Animate life expectancy ring
+const ring = document.getElementById('lifeExpectancyRing');
+const circumference = 2 * Math.PI * 40;
+ring.style.strokeDasharray = `${circumference} ${circumference}`;
+ring.style.strokeDashoffset = circumference;
+setTimeout(() => {
+const percent = 85;
+const offset = circumference - (percent / 100 * circumference);
+ring.style.strokeDashoffset = offset;
+}, 100);
+}
+function closeReport() {
+document.getElementById('reportModal').classList.add('hidden');
+}
+const translations = {
+'zh-TW': {
+'hero_title': 'LifeAI：預測您的壽命，釋放您的健康潛能！',
+'hero_desc': '參與我們全面的評估，了解您的健康、生活方式和長壽潛力。獲取個性化見解和可行建議。',
+'start_assessment': '開始評估',
+'time_estimate': '大約需要15分鐘',
+'categories_title': '評估類別',
+'categories_desc': '我們的全面評估涵蓋您生活的六個關鍵領域，為您提供最準確的分析和建議。',
+'food_nutrition': '飲食與營養',
+'food_nutrition_desc': '分析您的飲食習慣和營養攝入以達到最佳健康狀態。',
+'lifestyle_habits': '生活習慣',
+'lifestyle_habits_desc': '評估您的日常習慣及其對健康的影響。',
+'physical_activities': '體能活動',
+'physical_activities_desc': '測量您的運動模式和體能水平評估。',
+'living_environment': '生活環境',
+'living_environment_desc': '評估您的居住條件和環境因素。',
+'personal_preferences': '個人偏好',
+'personal_preferences_desc': '了解您的選擇及其對生活方式的影響。',
+'daily_routines': '日常作息',
+'daily_routines_desc': '檢視您的日程安排和時間管理模式。',
+'how_it_works': '運作方式',
+'how_it_works_desc': '我們的先進AI系統分析您的回答，提供個性化見解和建議。',
+'answer_questions': '回答問題',
+'answer_questions_desc': '完成我們關於您生活方式的全面問卷。',
+'ai_analysis': 'AI分析',
+'ai_analysis_desc': '我們的AI處理您的數據以生成見解。',
+'get_report': '獲取報告',
+'get_report_desc': '收到詳細的健康指標分析。',
+'take_action': '採取行動',
+'take_action_desc': '遵循個性化建議以改善。',
+'comprehensive_analysis': '全面健康分析',
+'comprehensive_desc': '我們的進階分析為您的健康和生活方式提供詳細見解：',
+'life_expectancy': '基於當前習慣的預期壽命預測',
+'body_function': '身體功能和生命體徵評估',
+'health_risk': '潛在健康風險識別',
+'lifestyle_improvement': '個性化生活方式改善建議',
+'user_testimonials': '用戶評價',
+'quick_links': '快速連結',
+'about_us': '關於我們',
+'how_works': '運作方式',
+'pricing': '價格',
+'contact': '聯絡我們',
+'legal': '法律條款',
+'privacy_policy': '隱私政策',
+'terms_service': '服務條款',
+'cookie_policy': 'Cookie政策',
+'newsletter': '電子報',
+'newsletter_desc': '訂閱以獲取最新見解和新聞。',
+'email_placeholder': '輸入您的電子郵件',
+'subscribe': '訂閱',
+'copyright': '© 2025 LifeAnalytics。保留所有權利。',
+'sign_in': '登入',
+'sign_up': '註冊'
+}
+};
+function changeLang(lang) {
+document.querySelectorAll('.lang-btn').forEach(btn => {
+if(btn.dataset.lang === lang) {
+btn.classList.add('bg-gray-100');
+} else {
+btn.classList.remove('bg-gray-100');
+}
+});
+if(lang === 'zh-TW') {
+Object.keys(translations['zh-TW']).forEach(key => {
+const elements = document.querySelectorAll(`[data-i18n="${key}"]`);
+elements.forEach(el => {
+el.textContent = translations['zh-TW'][key];
+});
+});
+}
+}
+const chart = echarts.init(document.getElementById('healthChart'));
+const option = {
+animation: false,
+tooltip: {
+trigger: 'axis',
+backgroundColor: 'rgba(255, 255, 255, 0.9)',
+textStyle: { color: '#1f2937' }
+},
+grid: { top: 10, right: 10, bottom: 20, left: 30 },
+xAxis: {
+type: 'category',
+data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+axisLine: { lineStyle: { color: '#e5e7eb' } }
+},
+yAxis: {
+type: 'value',
+axisLine: { lineStyle: { color: '#e5e7eb' } },
+splitLine: { lineStyle: { color: '#f3f4f6' } }
+},
+series: [
+{
+name: 'Health Score',
+type: 'line',
+smooth: true,
+data: [85, 88, 87, 90, 89, 92],
+lineStyle: { color: 'rgba(87, 181, 231, 1)' },
+areaStyle: {
+color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+{ offset: 0, color: 'rgba(87, 181, 231, 0.3)' },
+{ offset: 1, color: 'rgba(87, 181, 231, 0.1)' }
+])
+},
+symbol: 'none'
+}
+]
+};
+chart.setOption(option);
+window.addEventListener('resize', () => {
+chart.resize();
+});
+</script>
+</body>
+</html>
